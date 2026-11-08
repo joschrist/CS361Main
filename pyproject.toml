@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+buil-backend = "setuptools.build_meta"
+
+[project]
+name = "media-tracker"
+version = "0.1.0"
+description = "A command-line library for the books, movies, games, and albums you consume."
+requires-python = ">=3.10"
+dependencies = ["typer>=0.12"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "ruff"]
+
+[project.scripts]
+tracker = "tracker.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["tracker*"]
