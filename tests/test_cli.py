@@ -102,6 +102,87 @@ def test_add_guided(cli_db):
 
 
 def test_add_guided_cancel_saves_nothing(cli_db):
-    result = runner.invoke(app, ["add"], input="Dune\n")  # input ends before step 2
+    result = runner.invoke(app, ["add"], input="Dune\n")
     assert result.exit_code != 0
     assert core.list_items(path=cli_db) == []
+
+def test_edit_title(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit", "1", "--title", "Dune Messiah"])
+    assert result.exit_code == 0
+    assert "Updated item 1:" in result.output
+    assert "title: Dune → Dune Messiah" in result.output
+    assert 'To undo: tracker edit 1 --title "Dune"' in result.output
+    assert core.get_item(1, path=cli_db)["title"] == "Dune Messiah"
+
+
+def test_edit_type_quiet(cli_db):
+    core.add_item("Hades", "movie", path=cli_db)
+    result = runner.invoke(app, ["edit", "1", "--type", "game", "--quiet"])
+    assert "type: movie → game" in result.output
+    assert "Tip:" not in result.output
+
+
+def test_edit_nothing_to_change(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit", "1"])
+    assert result.exit_code == 1
+    assert "nothing to change. Nothing was changed." in result.output
+    assert 'run "tracker edit" with no' in result.output
+
+
+def test_edit_not_found(cli_db):
+    result = runner.invoke(app, ["edit", "9", "--title", "X"])
+    assert result.exit_code == 1
+    assert "no item with ID 9 was found. Nothing was changed." in result.output
+
+
+def test_edit_invalid_type_changes_nothing(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit", "1", "--type", "podcast"])
+    assert result.exit_code == 1
+    assert '"podcast" is not a valid type' in result.output
+    assert core.get_item(1, path=cli_db)["type"] == "book"
+
+
+def test_edit_blank_title_changes_nothing(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit", "1", "--title", "  "])
+    assert result.exit_code == 1
+    assert core.get_item(1, path=cli_db)["title"] == "Dune"
+
+
+def test_edit_pick_mode(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    core.add_item("Hades", "game", path=cli_db)
+    result = runner.invoke(app, ["edit"], input="2\nHades II\n\n")
+    assert "Which item do you want to edit?" in result.output
+    assert "title: Hades → Hades II" in result.output
+    assert core.get_item(2, path=cli_db)["title"] == "Hades II"
+    assert core.get_item(2, path=cli_db)["type"] == "game"
+
+
+def test_edit_pick_cancel(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit"], input="\n")
+    assert "Cancelled. Nothing was changed." in result.output
+    assert core.get_item(1, path=cli_db)["title"] == "Dune"
+
+
+def test_edit_pick_all_blank_is_nothing_to_change(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit"], input="1\n\n\n")
+    assert result.exit_code == 1
+    assert "nothing to change" in result.output
+
+
+def test_edit_pick_bad_id(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["edit"], input="abc\n")
+    assert result.exit_code == 1
+    assert "no item with ID abc was found" in result.output
+
+
+def test_edit_pick_empty_library(cli_db):
+    result = runner.invoke(app, ["edit"])
+    assert "Your library is empty." in result.output

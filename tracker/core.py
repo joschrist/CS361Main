@@ -20,18 +20,24 @@ def add_item(title, type_, allow_duplicate=False, path=storage.DEFAULT_DB_PATH):
     item_id = storage.insert_item(title, type_, path=path)
     return storage.get_item(item_id, path=path)
 
+def get_item(item_id, path=storage.DEFAULT_DB_PATH):
+    item = storage.get_item(item_id, path)
+    if not item:
+        raise TrackerError("not_found")
+    return item
+
 def list_items(path=storage.DEFAULT_DB_PATH):
     return storage.list_items(path)
 
 def edit_item(item_id, title=None, type_=None, path=storage.DEFAULT_DB_PATH):
-    if title is None and type is None:
+    if title is None and type_ is None:
         raise TrackerError("nothing_to_change")
     
     title, type_ = _clean_fields(title, type_)
 
-    old = storage.get_item(item_id, path=path)
+    old = get_item(item_id, path=path)
     storage.update_item(item_id, title, type_, path)
-    return old, storage.get_item(item_id, path)
+    return old, get_item(item_id, path)
 
 def delete_item(item_id, path=storage.DEFAULT_DB_PATH):
     storage.delete_item(item_id, path)
