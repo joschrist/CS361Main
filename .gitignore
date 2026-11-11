@@ -4,3 +4,4 @@ __pycahce__/
 .pytest_cache/
 .coverage
 *.egg-info
+scratch.db
