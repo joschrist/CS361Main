@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 import typer
 
+from typing import Optional
+
 from tracker import core, storage
 
 app = typer.Typer(
@@ -23,6 +25,34 @@ def _format_table(items):
         lines.append(f'{i["id"]:<{id_w}}{i["title"]:<{title_w}}{i["type"]}')
     return "\n".join(lines)
 
+STUCK_HINT = (
+    'Stuck? Run "tracker add" with no options and we\'ll guide you\n'
+    "step by step."
+)
+
+
+def _fail_add(code, title, type_):
+    """Print the prototype's error message for a failed add, then exit."""
+    valid = ", ".join(core.VALID_TYPES)
+    if code == "blank_title":
+        typer.echo("Error: a title is required. Nothing was saved.")
+    elif type_ is None or not type_.strip():
+        typer.echo("Error: a type is required. Nothing was saved.")
+        typer.echo(f"Valid types: {valid}")
+    else:
+        typer.echo(f'Error: "{type_}" is not a valid type. Nothing was saved.')
+        typer.echo(f"Valid types: {valid}")
+    typer.echo(STUCK_HINT)
+    raise typer.Exit(code=1)
+
+def _guided_prompts():
+    """Ask for the title and type one step at a time."""
+    typer.echo("Let's add an item. Press Ctrl+C at any time to cancel;")
+    typer.echo("nothing will be saved.")
+    title = typer.prompt("Step 1 of 2. Title")
+    type_ = typer.prompt("Step 2 of 2. Type (book, movie, game, album)")
+    return title, type_
+
 @app.command("list")
 def list_cmd(quiet: bool = typer.Option(False, "--quiet", help="Hide tips.")):
     items = core.list_items(path=_db_path())
@@ -39,4 +69,36 @@ def list_cmd(quiet: bool = typer.Option(False, "--quiet", help="Hide tips.")):
     if not quiet:
         typer.echo('\nTip: change an item with "tracker edit ID --title ..."')
         typer.echo('    remove one with "tracker delete ID"')
+
+@app.command("add")
+def add_cmd(
+    title: Optional[str] = typer.Argument(None, help="Name of the item (use quotes for spaces)."),
+    type: Optional[str] = typer.Option(None, help="One of: book, movie, game, album."),
+    quiet: bool = typer.Option(False, help="Hide tips."),
+):
+    """Add a new item to your library."""
+    path = _db_path()
+
+    if title is None and type is None:
+        title, type = _guided_prompts()
+
+    try:
+        item = core.add_item(title, type, path=path)
+    except core.TrackerError as err:
+        if err.code != "duplicate":
+            _fail_add(err.code, title, type)
+        existing = err.existing
+        typer.echo(
+            f'"{existing["title"]}" ({existing["type"]}) is already in your library '
+            f'as ID {existing["id"]}.'
+        )
+        if not typer.confirm("Add it again anyway?", default=False):
+            typer.echo("Cancelled. Nothing was saved.")
+            return
+        item = core.add_item(title, type, allow_duplicate=True, path=path)
+
+    typer.echo(f'Added: {item["title"]} ({item["type"]}), ID {item["id"]}')
+    if not quiet:
+        typer.echo('Tip: see everything with "tracker list".')
+        typer.echo(f'     To undo: tracker delete {item["id"]}')
     
