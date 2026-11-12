@@ -186,3 +186,95 @@ def test_edit_pick_bad_id(cli_db):
 def test_edit_pick_empty_library(cli_db):
     result = runner.invoke(app, ["edit"])
     assert "Your library is empty." in result.output
+
+def test_delete_typed_id(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    core.add_item("Hades", "game", path=cli_db)
+    result = runner.invoke(app, ["delete", "1"], input="y\n")
+    assert result.exit_code == 0
+    assert "Deleted item 1." in result.output
+    assert [i["title"] for i in core.list_items(path=cli_db)] == ["Hades"]
+
+
+def test_delete_summary_shows_item_and_restore_command(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete", "1"], input="n\n")
+    assert 'You are about to delete: "Dune" (book, ID 1).' in result.output
+    assert "It will be removed from your library right away." in result.output
+    assert 'tracker add "Dune" --type book' in result.output
+    assert "Delete it? [y/N]" in result.output
+
+
+def test_delete_answer_no_keeps_item(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete", "1"], input="n\n")
+    assert result.exit_code == 0
+    assert "Cancelled. Nothing was deleted." in result.output
+    assert len(core.list_items(path=cli_db)) == 1
+
+
+def test_delete_enter_defaults_to_no(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete", "1"], input="\n")
+    assert "Cancelled. Nothing was deleted." in result.output
+    assert len(core.list_items(path=cli_db)) == 1
+
+
+def test_delete_yes_flag_skips_question(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete", "1", "--yes"])
+    assert result.exit_code == 0
+    assert "Delete it?" not in result.output
+    assert "Deleted item 1." in result.output
+    assert core.list_items(path=cli_db) == []
+
+
+def test_delete_typed_id_not_found(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete", "9"])
+    assert result.exit_code == 1
+    assert "Error: no item with ID 9 was found. Nothing was changed." in result.output
+    assert 'Run "tracker list" to see valid IDs, or run "tracker delete"' in result.output
+    assert "to pick from a list." in result.output
+    assert len(core.list_items(path=cli_db)) == 1
+
+
+def test_delete_pick_mode(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    core.add_item("Hades", "game", path=cli_db)
+    result = runner.invoke(app, ["delete"], input="1\ny\n")
+    assert result.exit_code == 0
+    assert "Which item do you want to delete?" in result.output
+    assert "Deleted item 1." in result.output
+    assert [i["title"] for i in core.list_items(path=cli_db)] == ["Hades"]
+
+
+def test_delete_pick_cancel_at_id_prompt(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete"], input="\n")
+    assert result.exit_code == 0
+    assert "Cancelled." in result.output
+    assert len(core.list_items(path=cli_db)) == 1
+
+
+def test_delete_pick_not_a_number(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    result = runner.invoke(app, ["delete"], input="abc\n")
+    assert result.exit_code == 1
+    assert "no item with ID abc was found" in result.output
+    assert len(core.list_items(path=cli_db)) == 1
+
+
+def test_delete_pick_id_does_not_exist(cli_db):
+    core.add_item("Dune", "book", path=cli_db)
+    core.add_item("Hades", "game", path=cli_db)
+    result = runner.invoke(app, ["delete"], input="3\n")
+    assert result.exit_code == 1
+    assert "no item with ID 3 was found. Nothing was changed." in result.output
+    assert len(core.list_items(path=cli_db)) == 2
+
+
+def test_delete_empty_library(cli_db):
+    result = runner.invoke(app, ["delete"])
+    assert result.exit_code == 0
+    assert "Your library is empty." in result.output

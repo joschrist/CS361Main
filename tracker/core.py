@@ -40,7 +40,9 @@ def edit_item(item_id, title=None, type_=None, path=storage.DEFAULT_DB_PATH):
     return old, get_item(item_id, path)
 
 def delete_item(item_id, path=storage.DEFAULT_DB_PATH):
+    old = get_item(item_id, path=path)
     storage.delete_item(item_id, path)
+    return old
 
 def _clean_fields(title=None, type_=None, required= False):
 

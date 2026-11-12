@@ -60,6 +60,14 @@ def _fail_edit(code, item_id, type_):
         typer.echo(f"Valid types: {', '.join(core.VALID_TYPES)}")
     raise typer.Exit(code=1)
 
+def _fail_delete(code, item_id):
+    if code == "not_found":
+            typer.echo(f"Error: no item with ID {item_id} was found. Nothing was changed.")
+            typer.echo('Run "tracker list" to see valid IDs, or run "tracker delete"')
+            typer.echo("to pick from a list.")
+    raise typer.Exit(code=1)
+
+
 def _pick_item(path, verb):
     items = core.list_items(path=path)
     if not items:
@@ -77,7 +85,7 @@ def _pick_item(path, verb):
         raise typer.Exit()
     return answer
 
-def _guided_prompts():
+def _guided_add_prompts():
     typer.echo("Let's add an item. Press Ctrl+C at any time to cancel;")
     typer.echo("nothing will be saved.")
     title = typer.prompt("Step 1 of 2. Title")
@@ -110,7 +118,7 @@ def add_cmd(
     path = _db_path()
 
     if title is None and type is None:
-        title, type = _guided_prompts()
+        title, type = _guided_add_prompts()
 
     try:
         item = core.add_item(title, type, path=path)
@@ -177,3 +185,36 @@ def edit_cmd(
         undo.append(f'--type {old["type"]}')
     if not quiet:
         typer.echo(f'Tip: To undo: tracker edit {item_id} {" ".join(undo)}')    
+
+@app.command("delete")
+def delete_cmd(
+    item_id: Optional[int] = typer.Argument(None, metavar="ID", help="The item's number (see \"tracker list\")."),
+    yes: bool = typer.Option(False, help="Skip the \"Delete it?\" question."),
+):
+    path = _db_path()
+
+    if item_id is None:
+        answer = _pick_item(path, "delete")
+        if not answer.isdigit():
+            _fail_delete("not_found", answer)
+        item_id = int(answer)
+
+    try:
+        item = core.get_item(item_id, path=path)     
+    except core.TrackerError as err:
+        _fail_delete(err.code, item_id)
+        
+
+    typer.echo(f'You are about to delete: "{item["title"]}" ({item["type"]}, ID {item["id"]}).')
+    typer.echo("It will be removed from your library right away.")
+    typer.echo("To restore it later, run:")
+    typer.echo(f'  tracker add "{item["title"]}" --type {item["type"]}')
+
+    if not yes:
+        if not typer.confirm("Delete it?", default=False):
+                typer.echo("Cancelled. Nothing was deleted.")
+                return
+
+    core.delete_item(item_id, path=path)
+
+    typer.echo(f"Deleted item {item_id}.")
