@@ -278,3 +278,19 @@ def test_delete_empty_library(cli_db):
     result = runner.invoke(app, ["delete"])
     assert result.exit_code == 0
     assert "Your library is empty." in result.output
+
+
+def test_main_help_has_heuristic_text():
+    out = runner.invoke(app, ["--help"]).output
+    assert "Getting started in 3 steps:" in out
+    assert "nothing is sent anywhere" in out
+    assert "Less text:" in out
+    assert "see the Undo line" in out
+
+
+def test_command_help_has_two_ways_and_undo():
+    for cmd in ["add", "edit", "delete"]:
+        out = runner.invoke(app, [cmd, "--help"]).output
+        assert "Two ways to" in out
+        assert "Undo:" in out
+    assert "Undo:" in runner.invoke(app, ["list", "--help"]).output

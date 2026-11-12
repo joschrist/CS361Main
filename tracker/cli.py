@@ -7,7 +7,27 @@ from typing import Optional
 from tracker import core, storage
 
 app = typer.Typer(
-    help="A command-line library for the books, movies, games, and albums you consume."
+    rich_markup_mode=None,
+    help=(
+        "Media Tracker keeps every book, movie, game, and album you enjoy in one "
+        "library, so everything you track is in one place.\n\n"
+        "\b\n"
+        "Getting started in 3 steps:\n"
+        '  1. Add an item:       tracker add "Dune" --type book\n'
+        "  2. See your library:  tracker list\n"
+        '  3. Fix a mistake:     tracker edit 1 --title "New title"\n'
+        "                        tracker delete 1"
+    ),
+    epilog=(
+        "\b\n"
+        "Cost: each command takes a few seconds. Your library is stored\n"
+        "in a file on this computer only; nothing is sent anywhere.\n\n"
+        "\b\n"
+        "More detail:  tracker <command> --help\n"
+        "Less text:    add --quiet to list, add, or edit to hide tips\n"
+        "Mistakes:     every change can be reversed; see the Undo line\n"
+        "              in each command's help."
+    ),
 )
 
 def _db_path():
@@ -15,7 +35,7 @@ def _db_path():
 
 @app.callback()
 def main() -> None:
-    """A command-line library for the books, movies, games, and albums you consume."""
+    pass
 
 def _format_table(items):
     id_w = max([len("ID")] + [len(str(i["id"])) for i in items]) + 3
@@ -94,6 +114,10 @@ def _guided_add_prompts():
 
 @app.command("list")
 def list_cmd(quiet: bool = typer.Option(False, "--quiet", help="Hide tips.")):
+    """Show all items in your library.
+
+    Undo: list only reads your library; it changes nothing.
+    """
     items = core.list_items(path=_db_path())
 
     if not items:
@@ -115,6 +139,17 @@ def add_cmd(
     type: Optional[str] = typer.Option(None, help="One of: book, movie, game, album."),
     quiet: bool = typer.Option(False, help="Hide tips."),
 ):
+    """Add a new item to your library.
+
+    \b
+    Two ways to add an item:
+      Quick:   tracker add "Abbey Road" --type album
+      Guided:  tracker add   (we ask you step by step)
+
+    \b
+    Undo: to remove an item you just added, run
+          tracker delete ID
+    """
     path = _db_path()
 
     if title is None and type is None:
@@ -147,6 +182,17 @@ def edit_cmd(
     type: Optional[str] = typer.Option(None, help="New type: book, movie, game, or album."),
     quiet: bool = typer.Option(False, help="Hide tips."),
 ):
+    """Change an item's title or type.
+
+    \b
+    Two ways to edit an item:
+      With an ID:     tracker edit 3 --title "Dune Messiah"
+      Pick from list: tracker edit   (you choose)
+
+    \b
+    Undo: edit it again with the old value. The confirmation
+          always shows the old value.
+    """
     path = _db_path()
     picked = item_id is None
 
@@ -191,6 +237,16 @@ def delete_cmd(
     item_id: Optional[int] = typer.Argument(None, metavar="ID", help="The item's number (see \"tracker list\")."),
     yes: bool = typer.Option(False, help="Skip the \"Delete it?\" question."),
 ):
+    """Remove an item from your library.
+
+    \b
+    Two ways to delete an item:
+      With an ID:     tracker delete 3
+      Pick from list: tracker delete   (you choose)
+
+    \b
+    Undo: the confirmation shows the command that restores it.
+    """
     path = _db_path()
 
     if item_id is None:
